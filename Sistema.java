@@ -121,6 +121,27 @@ public class Sistema {
 			pc = _pc;                                              // limite e pc (deve ser zero nesta versao)
 			irpt = Interrupts.noInterrupt;                         // reset da interrupcao registrada
 		}
+
+		//Executa o processo até que uma interrupção ocorra.
+		public void runProcess(int _base, int _limite, int _pc) {
+			setContext(_base, _limite, _pc);
+			run();
+		}
+
+		//Habilita o modo de depuração (debug) na CPU.
+		public void traceOn() {
+			debug = true;
+		}
+
+		//Desabilita o modo de depuração (debug) na CPU.
+		public void traceOff() {
+			debug = false;
+		}
+
+		//Define o modo de depuração (debug) conforme o valor passado.
+		public void setTraceMode(boolean mode) {
+			debug = mode;
+		}
 		
 		public void run() { 		// execucao da CPU supoe que o contexto da CPU, vide acima, esta devidamente setado			
 			while (true) { 			// ciclo de instrucoes. acaba cfe instrucao, veja cada caso.
@@ -336,27 +357,28 @@ public class Sistema {
 		public int tamMem;    
         public Word[] m;  
 		public Memory mem;   
-        public CPU cpu;   
-		// public GM_Paginada gm;
-		// public int tamPag;
-		public GM_Particionada gm;
-		public int tamPart;
+        public CPU cpu;  
+		public GP gp; 
 
+		public GM_Paginada gm;
+		public int tamPagOuPart;
 
-		//****************************************************************************************************
-		//***************************************TROCAR AQUI PAG/PART*****************************************
-		//****************************************************************************************************
+		//public GM_Particionada gm;
+		//public int tamPart;
 
         public VM(InterruptHandling ih, SysCallHandling sysCall){   
-		 // vm deve ser configurada com endereço de tratamento de interrupcoes e de chamadas de sistema
-	     // cria memória
-		     tamMem = 1024; //transformar em parametro
-  		 	 mem = new Memory(tamMem);
-			 m = mem.m;
-	  	 // cria cpu
-			 cpu = new CPU(mem,ih,sysCall, true);                   // true liga debug
-			//  gm = new GM_Paginada(tamMem, tamPag);
-			 gm = new GM_Particionada(tamMem, tamPart);
+			// vm deve ser configurada com endereço de tratamento de interrupcoes e de chamadas de sistema
+		    tamMem = 1024;
+  		 	mem = new Memory(tamMem);
+			m = mem.m;
+			cpu = new CPU(mem,ih,sysCall, true); // true liga debug
+			gp = new GP();
+
+			tamPagOuPart = 16;
+			gm = new GM_Paginada(tamMem, tamPagOuPart);
+
+			//gm = new GM_Particionada(tamMem, tamPagOuPart);
+			
 	    }	
 	}
     // ------------------- V M  - fim ------------------------------------------------------------------------
@@ -417,18 +439,19 @@ public class Sistema {
 	// -------------------------------------------------------------------------------------------------------
     // -------------------  S I S T E M A --------------------------------------------------------------------
 
-	public VM vm;
-	public InterruptHandling ih;
-	public SysCallHandling sysCall;
-	public static Programas progs;
+    private static Scanner scanner = new Scanner(System.in);
+    private static VM vm;
+    private InterruptHandling ih;
+    private SysCallHandling sysCall;
+    private Programas progs;
 	
 
     public Sistema(){   // a VM com tratamento de interrupções
-		 ih = new InterruptHandling();
-         sysCall = new SysCallHandling();
-		 vm = new VM(ih, sysCall);
-		 sysCall.setVM(vm);
-		 progs = new Programas();
+        ih = new InterruptHandling();
+        sysCall = new SysCallHandling();
+        vm = new VM(ih, sysCall);
+        sysCall.setVM(vm);
+        progs = new Programas();
 	}
 
     // -------------------  S I S T E M A - fim --------------------------------------------------------------
@@ -438,90 +461,119 @@ public class Sistema {
     // ------------------- instancia e testa sistema
 	public static void main(String args[]) {
 		Sistema s = new Sistema();			
-		//s.loadAndExec(progs.fibonacci10);
-		//s.loadAndExec(progs.progMinimo);
+		//s.loadAndExec(s.progs.fibonacci10);
+		//s.loadAndExec(s.progs.progMinimo);
 
-		s.loadAndExec(progs.fatorial);
-		//s.loadAndExec(progs.fatorialTRAP); // saida
-		//s.loadAndExec(progs.fibonacciTRAP); // entrada
-		//s.loadAndExec(progs.PC); // bubble sort
+		s.loadAndExec(s.progs.fatorial);
+		//s.loadAndExec(s.progs.fatorialTRAP); // saida
+		//s.loadAndExec(s.progs.fibonacciTRAP); // entrada
+		//s.loadAndExec(s.progs.PC); // bubble sort
 
-
-		//definir todas constantes
-
-		// showMenu();
+		executaMenu();
 	}
 
-	// public static void showMenu() {
+	public static void showMenu() {
+		System.out.println("\n===============MENU===============");
+		System.out.println("Escolha a opcao desejada: ");
+		System.out.println("1: Criar processo");
+		System.out.println("2: Remover processo");
+		System.out.println("3: Listar todos processos");
+		System.out.println("4: Listar conteudo do PCB e o conteudo da memoria do processo com id");
+		System.out.println("5: Listar a memoria entre posicoes inicio e fim, independente do processo");
+		System.out.println("6: Executar processo a partir de um ID");
+		System.out.println("7: Ligar modo de execucao em que CPU print cada instrucao executada");
+		System.out.println("8: Desligar o modo de execução acima");
+		System.out.println("9: Sair do sistema");
+	}
 
-	// 	int opcao = 0;
+	
+	public static void executaMenu() {
+		int opcao = 0;
+		do {
+			showMenu();
+			opcao = scanner.nextInt();
+			switch (opcao) {
+				case 1:
+					//Criar processo
+					System.out.println("Digite o tamanho do processo que deseja criar:");
+					int tamanhoProcesso = scanner.nextInt();
 
-	// 	do {
-	// 		System.out.println("Escolha a opção desejada: ");
-	// 		System.out.println("1: Criar processo");
-	// 		System.out.println("2: Remover processo");
-	// 		System.out.println("3: Listar todos processos");
-	// 		System.out.println("4: Listar conteúdo do PCB e o conteúdo da memória do processo com id");
-	// 		System.out.println("5: Listar a memória entre posições início e fim, independente do processo");
-	// 		System.out.println("6: Executar processo a partir de um ID");
-	// 		System.out.println("7: Ligar modo de execução em que CPU print cada instrução executada");
-	// 		System.out.println("8: Desligar o modo de execução acima");
-	// 		System.out.println("9: Sair do sistema");
-	// 	}while(opcao != 9);
-
-	// 	switch (opcao) {
-	// 		case 1:
-	// 			//criar processo
-
-	// 			criarProcesso();
-
-	// 			break;
-
-	// 		case 2:
-	// 			//remover processo
-	// 			break;
-	// 		case 3:
-	// 		//remover processo
-	// 			break;	
-	// 		case 4:
-	// 		//remover processo
-	// 			break;	
-	// 		case 5:
-	// 		//remover processo
-	// 			break;	
-	// 		case 6:
-	// 		//remover processo
-	// 			break;	
-	// 		case 7:
-	// 		//remover processo
-	// 			break;	
-	// 		case 8:
-	// 		//remover processo
-	// 			break;	
-	// 		case 9:
-	// 		//remover processo
-	// 			break;	
-				
-	// 		default:
-	// 			break;
-	// 	}
-	// }
+					//boolean processoCriado = vm.gp.criaProcessoParticionada(tamanhoProcesso);
+					boolean processoCriado = vm.gp.criaProcessoPaginada(tamanhoProcesso);
+					
+					if(processoCriado) {
+						System.out.println("Processo criado com sucesso!");
+					} else {
+						System.out.println("Erro ao criar o processo. Memória insuficiente ou outro problema.");
+					}
+					break;
+				case 2:
+					//Remover processo
+					System.out.println("Digite o ID do processo que deseja remover:");
+					int idProcesso = scanner.nextInt();
+					boolean processoRemovido = vm.gp.desalocaProcesso(idProcesso);
+					if(processoRemovido) {
+						System.out.println("Processo removido com sucesso!");
+					} else {
+						System.out.println("Erro ao remover o processo. ID inválido ou outro problema.");
+					}
+					break;
+				case 3:
+					//Listar todos processos
+					vm.gp.listaProcessos();
+					break;	
+				case 4:
+					//Listar conteudo do PCB e o conteúdo da memoria do processo com id
+					System.out.println("Digite o ID do processo que deseja listar:");
+					int idProcessoListar = scanner.nextInt();
+					vm.gp.dump(idProcessoListar);
+					break;	
+				case 5:
+					//Listar a memoria entre posicoes inicio e fim, independente do processo
+					vm.gm.dumpMemoria(0, vm.gm.qtdPartOuPag - 1);
+					break;
+				case 6:
+					//Executar processo a partir de um ID
+					System.out.println("Digite o ID do processo que deseja executar:");
+					int idProcessoExecutar = scanner.nextInt();
+					vm.gp.executa(idProcessoExecutar);
+					break;	
+				case 7:
+					//Ligar modo de execução em que CPU print cada instrução executada
+					vm.cpu.traceOn();
+					System.out.println("Modo de execução ligado.");
+					break;	
+				case 8:
+					//Desligar o modo de execução acima
+					vm.cpu.traceOff();
+					System.out.println("Modo de execução desligado.");
+					break;	
+				case 9:
+					//Sair do sistema
+					System.out.println("Tchau!");
+					break;	
+				default:
+					System.out.println("Opcao inválida! Redigite.");
+			}
+		} while(opcao != 9);
+	}
 	
 
 	public class GM_Particionada {
 
 		int tamMem;
 		int tamPart;
-		int qtdPart = tamMem/tamPart;
+		int qtdPartOuPag;
 
 		//array de boolean para representar a memoria, FALSE eh posicao LIVRE, TRUE eh posicao OCUPADA
-		boolean[] memoria = new boolean[qtdPart];
-
-
+		boolean[] memoria;
 
 		public GM_Particionada(int tamanhoMemoria, int tamanhoParticao) {
 			tamMem = tamanhoMemoria;
 			tamPart = tamanhoParticao;
+			qtdPartOuPag = tamMem/tamPart;
+
+			memoria = new boolean[qtdPartOuPag];
 		}
 
 		public int aloca(int tamProg) {
@@ -539,58 +591,54 @@ public class Sistema {
 
 		public void desaloca(int[] particao) {
 			//variavel particao vai ser um array com apenas uma posicao, contendo a particao em que o programa esta alocado
-
 			memoria[particao[0]] = false;
-			
 		}
 
-		public void dumpMemoria() {
+		public void dumpMemoria(int inicio, int fim) {
 			System.out.print("[ ");
-			for (boolean pos : memoria) {
-				System.out.print(pos + " ");
+			for (int i = inicio; i <= fim; i++) {
+				System.out.print(memoria[i] + " ");
 			}
-			System.out.println(" ]");
+			System.out.println("]");
 		}
 		
 	}
-
-
 
 	public class GM_Paginada {
 
 		int tamMem;
 		int tamPag;
-		int qtdPaginas = tamMem/tamPag;
-		int qtdPaginasLivres = qtdPaginas;
+		int qtdPartOuPag;
+		int qtdPaginasLivres;
 
-		boolean[] memoria = new boolean[qtdPaginas];
+		boolean[] memoria;
 
 		
 		public GM_Paginada(int tamanhoMemoria, int tamanhoPagina) {
 			tamMem = tamanhoMemoria;
 			tamPag = tamanhoPagina;
+
+			qtdPartOuPag = tamMem/tamPag;
+			qtdPaginasLivres = qtdPartOuPag;
+			memoria = new boolean[qtdPartOuPag];
 		}
 
 		public boolean aloca(int qtdPaginas, int[] tabelaPaginas) {
-
-			if (qtdPaginas <= qtdPaginasLivres) {
-				
+			if (qtdPaginas <= qtdPaginasLivres && qtdPaginas <= tabelaPaginas.length) {
 				int indexTabelaPaginas = 0;
-				
 				for (int i = 0; i < memoria.length; i++) {
-
 					if (memoria[i] == false) {
 						memoria[i] = true;
 						qtdPaginasLivres--;
 						tabelaPaginas[indexTabelaPaginas] = i;
 						indexTabelaPaginas++;
+						if (indexTabelaPaginas >= tabelaPaginas.length) {
+							break;
+						}
 					}
-					
 				}
-
 				return true;
 			}
-
 			return false;
 		}
 
@@ -600,10 +648,16 @@ public class Sistema {
 			}
 		}
 
-		public void dumpMemoria() {
+		public void dumpMemoria(int inicio, int fim) {
+			// Validando as entradas
+			if (inicio < 0 || fim >= memoria.length || inicio > fim) {
+				System.out.println("Posições inválidas!");
+				return;
+			}
+		
 			System.out.print("[ ");
-			for (boolean pos : memoria) {
-				System.out.print(pos + " ");
+			for (int i = inicio; i <= fim; i++) {
+				System.out.print(memoria[i] + " ");
 			}
 			System.out.println(" ]");
 		}
@@ -612,94 +666,119 @@ public class Sistema {
 
 	public class GP {
 
-		ArrayList<PCB> listaPCB;
+		ArrayList<PCB> listaPCB = new ArrayList<>();
 		int idPCB = 0;
 
-		// public boolean criaProcessoPaginada(int tamanhoProcesso) {
-		// 	//tamanhoProcesso serve tanto para para paginacao ou particao, se for 1 eh ou uma pagina ou particao, se for maior eh paginas 
+		public GP() {
+		}
+
+		public boolean criaProcessoPaginada(int tamanhoProcesso) {
+			//tamanhoProcesso serve tanto para para paginacao ou particao, se for 1 eh ou uma pagina ou particao, se for maior eh paginas 
 			
-		// 	int[] tabelaPaginas = new int[tamanhoProcesso];
-		// 	boolean conseguiuAlocar = vm.gm.aloca(tamanhoProcesso, tabelaPaginas);
+			int[] tabelaPaginas = new int[tamanhoProcesso];
+			boolean conseguiuAlocar = vm.gm.aloca(tamanhoProcesso, tabelaPaginas);
 
-		// 	//pensar como vamos verificar se conseguiu alocar
-		// 	if(conseguiuAlocar) {
-		// 		idPCB++;
-		// 		PCB pcb = new PCB(tamanhoProcesso, idPCB, tabelaPaginas);
-
-		// 		listaPCB.add(pcb);
-
-		// 	} else {
-		// 		return false;
-		// 	}
-			
-		// }
-
-		public boolean criaProcessoParticionada(int tamanhoProcesso) {
-
-			int[] particaoAlocada = new int[1];
-			particaoAlocada[0] = vm.gm.aloca(tamanhoProcesso);
-
-			if (particaoAlocada[0] > -1) {
+			//pensar como vamos verificar se conseguiu alocar
+			if(conseguiuAlocar) {
 				idPCB++;
-				int pc = 0;
-				PCB pcb = new PCB(tamanhoProcesso, idPCB, particaoAlocada);
+				PCB pcb = new PCB(tamanhoProcesso, idPCB, tabelaPaginas);
 				listaPCB.add(pcb);
-
 				return true;
-
 			} else {
 				return false;
 			}
 		}
 
+		// public boolean criaProcessoParticionada(int tamanhoProcesso) {
+
+		// 	int[] particaoAlocada = new int[1];
+		// 	particaoAlocada[0] = vm.gm.aloca(tamanhoProcesso);
+
+		// 	if (particaoAlocada[0] > -1) {
+		// 		idPCB++;
+		// 		int pc = 0;
+		// 		PCB pcb = new PCB(tamanhoProcesso, idPCB, particaoAlocada);
+		// 		listaPCB.add(pcb);
+
+		// 		return true;
+
+		// 	} else {
+		// 		return false;
+		// 	}
+		// }
+
 		//desalocar processo
 		public boolean desalocaProcesso(int idProcesso) {
-			for (PCB pcb : listaPCB) {
+			Iterator<PCB> iterator = listaPCB.iterator();
+			while (iterator.hasNext()) {
+				PCB pcb = iterator.next();
 				if (pcb.id == idProcesso) {
 					vm.gm.desaloca(pcb.particoesOuPaginas);
+					iterator.remove();  // Remove o PCB da lista.
 					return true;
 				}
 			}
-
 			return false;
 		}
 
 		//listar todos PCBs
 		public void listaProcessos() {
-			for (PCB pcb : listaPCB) {
-				System.out.println(pcb.toString());
+			if(listaPCB.isEmpty()) {
+				System.out.println("\nNão há processos na lista.");
 			}
-		}
-
-		//lista o conteúdo do PCB e o conteúdo da partição de memória do processo com id
-		//REVISAR, ACHO QUE NAO TA PRONTO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		public void dump(int id) {
-			for (PCB pcb : listaPCB) {
-				if (pcb.id == id) {
+			else {
+				System.out.println("\nLista de processos: ");
+				for (PCB pcb : listaPCB) {
 					System.out.println(pcb.toString());
 				}
 			}
 		}
 
-		//executa o processo com id fornecido. se não houver processo, retorna erro.
-		public void executa(int id) {
+		//lista o conteúdo do PCB e o conteúdo da partição de memória do processo com id
+		public void dump(int id) {
+			boolean encontrou = false;
 			for (PCB pcb : listaPCB) {
 				if (pcb.id == id) {
-					//executar processo!!!!
+					encontrou = true;
+					System.out.println("\n" + pcb.toString());
+		
+					// Mostrando a memória:
+					for (int i : pcb.particoesOuPaginas) {
+						System.out.println("Endereço: " + i + " - Valor: " + vm.m[i]);
+					}
 				}
+			}
+			if(!encontrou) {
+				System.out.println("Não foi encontrado processo com o ID informado.");
 			}
 		}
 
-		//liga modo de execução em que CPU print cada instrução executada
+		//executa o processo com id fornecido. se não houver processo, retorna erro.
+		public void executa(int id) {
+			boolean encontrou = false;
+			for (PCB pcb : listaPCB) {
+				if (pcb.id == id) {
+					encontrou = true;
+					int base = pcb.particoesOuPaginas[0];
+					int limite = pcb.particoesOuPaginas[pcb.particoesOuPaginas.length - 1];
+					vm.cpu.runProcess(base, limite, pcb.pc);
+					break;
+				}
+			}
+			if(!encontrou) {
+				System.out.println("Não foi encontrado processo com o ID informado.");
+			}
+		}
+
+		//liga modo de execução em que CPU print cada instrução executada
 		public void traceOn() {
-			//NAO SEI Q PORRA EH ESSA
+			vm.cpu.setTraceMode(true);
 		}
 
-		//desligar o modo de execução em que CPU print cada instrução executada
+		//desliga o modo acima
 		public void traceOff() {
-			//NAO SEI Q PORRA EH ESSA 2
+			vm.cpu.setTraceMode(false);
 		}
-
 
 	}
 
@@ -718,11 +797,10 @@ public class Sistema {
 
 		@Override
 		public String toString() {
-
-			return "PCB [ id: " + id + ",\nquantidade particoes ou paginas: " + qtdPaginasOuParticoes + 
-					",\nparticoes ou paginas alocadas: " + particoesOuPaginas + "\n]";
-			
-			
+			return "PCB [ id: " + id +
+				   ",\nquantidade particoes ou paginas: " + qtdPaginasOuParticoes + 
+				   ",\nparticoes ou paginas alocadas: " + Arrays.toString(particoesOuPaginas) + 
+				   "\n]";
 		}
 	}
 
